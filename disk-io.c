@@ -1125,6 +1125,9 @@ static struct btrfs_fs_info *__open_ctree_fd(int fp, const char *path,
 	if (flags & OPEN_CTREE_TEMPORARY_SUPER)
 		sbflags = SBREAD_TEMPORARY;
 
+	if (fs_info->ignore_fsid_mismatch)
+		sbflags |= SBREAD_IGNORE_UUID_MISMATCH;
+
 	ret = btrfs_scan_fs_devices(fp, path, &fs_devices, sb_bytenr, sbflags,
 			(flags & OPEN_CTREE_NO_DEVICES));
 	if (ret)
@@ -1376,9 +1379,14 @@ static int check_super(struct btrfs_super_block *sb, unsigned sbflags)
 
 		uuid_unparse(sb->fsid, fsid);
 		uuid_unparse(sb->dev_item.fsid, dev_fsid);
-		error("dev_item UUID does not match fsid: %s != %s",
-			dev_fsid, fsid);
-		goto error_out;
+		if (sbflags & SBREAD_IGNORE_UUID_MISMATCH) {
+			warning("ignored: dev_item fsid mismatch: %s != %s",
+					dev_fsid, fsid);
+		} else {
+			error("dev_item UUID does not match fsid: %s != %s",
+					dev_fsid, fsid);
+			goto error_out;
+		}
 	}
 
 	/*

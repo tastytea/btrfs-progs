@@ -100,6 +100,8 @@ enum btrfs_read_sb_flags {
 	 * SBREAD_RECOVER
 	 */
 	SBREAD_TEMPORARY = (1 << 1),
+
+	SBREAD_IGNORE_UUID_MISMATCH = (1 << 2),
 };
 
 /*
