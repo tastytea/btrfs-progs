@@ -1884,8 +1884,10 @@ static int group_profile_devs_min(u64 flag)
 	case BTRFS_BLOCK_GROUP_RAID5:
 		return 2;
 	case BTRFS_BLOCK_GROUP_RAID6:
+	case BTRFS_BLOCK_GROUP_RAID1C3:
 		return 3;
 	case BTRFS_BLOCK_GROUP_RAID10:
+	case BTRFS_BLOCK_GROUP_RAID1C4:
 		return 4;
 	default:
 		return -1;
@@ -1901,9 +1903,9 @@ int test_num_disk_vs_raid(u64 metadata_profile, u64 data_profile,
 	switch (dev_cnt) {
 	default:
 	case 4:
-		allowed |= BTRFS_BLOCK_GROUP_RAID10;
+		allowed |= BTRFS_BLOCK_GROUP_RAID10 | BTRFS_BLOCK_GROUP_RAID1C4;
 	case 3:
-		allowed |= BTRFS_BLOCK_GROUP_RAID6;
+		allowed |= BTRFS_BLOCK_GROUP_RAID6 | BTRFS_BLOCK_GROUP_RAID1C3;
 	case 2:
 		allowed |= BTRFS_BLOCK_GROUP_RAID0 | BTRFS_BLOCK_GROUP_RAID1 |
 			BTRFS_BLOCK_GROUP_RAID5;
@@ -1955,7 +1957,10 @@ int group_profile_max_safe_loss(u64 flags)
 	case BTRFS_BLOCK_GROUP_RAID10:
 		return 1;
 	case BTRFS_BLOCK_GROUP_RAID6:
+	case BTRFS_BLOCK_GROUP_RAID1C3:
 		return 2;
+	case BTRFS_BLOCK_GROUP_RAID1C4:
+		return 3;
 	default:
 		return -1;
 	}
@@ -2170,6 +2175,10 @@ const char* btrfs_group_profile_str(u64 flag)
 		return "RAID0";
 	case BTRFS_BLOCK_GROUP_RAID1:
 		return "RAID1";
+	case BTRFS_BLOCK_GROUP_RAID1C3:
+		return "RAID1C3";
+	case BTRFS_BLOCK_GROUP_RAID1C4:
+		return "RAID1C4";
 	case BTRFS_BLOCK_GROUP_RAID5:
 		return "RAID5";
 	case BTRFS_BLOCK_GROUP_RAID6:

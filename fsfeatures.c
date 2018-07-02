@@ -86,6 +86,12 @@ static const struct btrfs_fs_feature {
 		VERSION_TO_STRING2(4,0),
 		NULL, 0,
 		"no explicit hole extents for files" },
+	{ "extraid", BTRFS_FEATURE_INCOMPAT_EXTENDED_RAID,
+		"extended_raid",
+		VERSION_TO_STRING2(4,17),
+		NULL, 0,
+		NULL, 0,
+		"extended raid features: raid1c3, raid1c4" },
 	/* Keep this one last */
 	{ "list-all", BTRFS_FEATURE_LIST_ALL, NULL }
 };
