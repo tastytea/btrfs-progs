@@ -39,7 +39,7 @@
 #include "crc32c.h"
 #include "utils.h"
 #include "btrfsck.h"
-#include "commands.h"
+#include "cmds/commands.h"
 #include "rescue.h"
 
 struct recover_control {

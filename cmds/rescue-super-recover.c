@@ -33,7 +33,7 @@
 #include "utils.h"
 #include "crc32c.h"
 #include "volumes.h"
-#include "commands.h"
+#include "cmds/commands.h"
 #include "rescue.h"
 
 struct btrfs_recover_superblock {
