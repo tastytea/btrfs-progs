@@ -40,6 +40,7 @@
 #include "common/utils.h"
 #include "btrfs-list.h"
 #include "common/help.h"
+#include "common/format-output.h"
 
 static int wait_for_subvolume_cleaning(int fd, size_t count, uint64_t *ids,
 				       int sleep_interval)
@@ -932,15 +933,53 @@ static const char * const cmd_subvol_show_usage[] = {
 	"-r|--rootid   rootid of the subvolume",
 	"-u|--uuid     uuid of the subvolume",
 	HELPINFO_UNITS_SHORT_LONG,
+	HELPINFO_INSERT_GLOBALS,
 	"",
 	"If no option is specified, subvolume at <path> will be shown, otherwise",
 	"the rootid or uuid are resolved relative to the <path>.",
 	NULL
 };
 
+static const struct rowspec subvol_show_rowspec[] = {
+	{ .key = "path", .fmt = "%s", .out_text = "", .out_json = "path" },
+	{ .key = "name", .fmt = "%s", .out_text = "Name", .out_json = "name" },
+	{ .key = "uuid", .fmt = "uuid", .out_text = "UUID", .out_json = "uuid" },
+	{ .key = "parent-uuid", .fmt = "uuid",
+	  .out_text = "Parent UUID", .out_json = "parent_uuid" },
+	{ .key = "received-uuid", .fmt = "uuid",
+	  .out_text = "Received UUID", .out_json = "received_uuid" },
+	{ .key = "otime", .fmt = "time-long",
+	  .out_text = "Creation time", .out_json = "otime" },
+	{ .key = "subvolume-id", .fmt = "%" PRIu64,
+	  .out_text = "Subvolume ID", .out_json = "subvolume_id" },
+	{ .key = "generation", .fmt = "%" PRIu64,
+	  .out_text = "Generation", .out_json = "generation" },
+	{ .key = "ogeneration", .fmt = "%" PRIu64,
+	  .out_text = "Gen at creation", .out_json = "ogeneration" },
+	{ .key = "parent-id", .fmt = "%" PRIu64,
+	  .out_text = "Parent ID", .out_json = "parent_id" },
+	{ .key = "toplevel-id", .fmt = "%" PRIu64,
+	  .out_text = "Top level ID", .out_json = "toplevel_id" },
+	{ .key = "flags", .fmt = "%s", .out_text = "Flags", .out_json = "flags" },
+	{ .key = "snapshots", .fmt = "list",
+	  .out_text = "Snapshot(s)", .out_json = "snapshots" },
+	{ .key = "quota-group", .fmt = "map",
+	  .out_text = "Quota group", .out_json = "quota-group" },
+	{ .key = "quota-groupid", .fmt = "qgroupid",
+	  .out_text = "Qgroup id", .out_json = "qgroupid" },
+	{ .key = "quota-limit-ref", .fmt = "size-or-none",
+	  .out_text = "Limit referenced", .out_json = "qgroup-limit-referenced" },
+	{ .key = "quota-limit-excl", .fmt = "size-or-none",
+	  .out_text = "Limit exclusive", .out_json = "qgroup-limit-exclusive" },
+	{ .key = "quota-usage-ref", .fmt = "size",
+	  .out_text = "Limit referenced", .out_json = "qgroup-usage-referenced" },
+	{ .key = "quota-usage-excl", .fmt = "size",
+	  .out_text = "Limit exclusive", .out_json = "qgroup-usage-exclusive" },
+	ROWSPEC_END
+};
+
 static int cmd_subvol_show(const struct cmd_struct *cmd, int argc, char **argv)
 {
-	char tstr[256];
 	char uuidparse[BTRFS_UUID_UNPARSED_SIZE];
 	char *fullpath = NULL;
 	int fd = -1;
@@ -956,6 +995,7 @@ static int cmd_subvol_show(const struct cmd_struct *cmd, int argc, char **argv)
 	enum btrfs_util_error err;
 	struct btrfs_qgroup_stats stats;
 	unsigned int unit_mode;
+	struct format_ctx fctx;
 
 	unit_mode = get_unit_mode_from_arg(&argc, argv, 1);
 
@@ -1057,52 +1097,25 @@ static int cmd_subvol_show(const struct cmd_struct *cmd, int argc, char **argv)
 
 	}
 
-	/* print the info */
-	printf("%s\n", subvol.id == BTRFS_FS_TREE_OBJECTID ? "/" : subvol_path);
-	printf("\tName: \t\t\t%s\n",
-	       (subvol.id == BTRFS_FS_TREE_OBJECTID ? "<FS_TREE>" :
-		basename(subvol_path)));
-
-	if (uuid_is_null(subvol.uuid))
-		strcpy(uuidparse, "-");
-	else
-		uuid_unparse(subvol.uuid, uuidparse);
-	printf("\tUUID: \t\t\t%s\n", uuidparse);
-
-	if (uuid_is_null(subvol.parent_uuid))
-		strcpy(uuidparse, "-");
-	else
-		uuid_unparse(subvol.parent_uuid, uuidparse);
-	printf("\tParent UUID: \t\t%s\n", uuidparse);
-
-	if (uuid_is_null(subvol.received_uuid))
-		strcpy(uuidparse, "-");
-	else
-		uuid_unparse(subvol.received_uuid, uuidparse);
-	printf("\tReceived UUID: \t\t%s\n", uuidparse);
-
-	if (subvol.otime.tv_sec) {
-		struct tm tm;
-
-		localtime_r(&subvol.otime.tv_sec, &tm);
-		strftime(tstr, 256, "%Y-%m-%d %X %z", &tm);
-	} else
-		strcpy(tstr, "-");
-	printf("\tCreation time: \t\t%s\n", tstr);
-
-	printf("\tSubvolume ID: \t\t%" PRIu64 "\n", subvol.id);
-	printf("\tGeneration: \t\t%" PRIu64 "\n", subvol.generation);
-	printf("\tGen at creation: \t%" PRIu64 "\n", subvol.otransid);
-	printf("\tParent ID: \t\t%" PRIu64 "\n", subvol.parent_id);
-	printf("\tTop level ID: \t\t%" PRIu64 "\n", subvol.parent_id);
-
-	if (subvol.flags & BTRFS_ROOT_SUBVOL_RDONLY)
-		printf("\tFlags: \t\t\treadonly\n");
-	else
-		printf("\tFlags: \t\t\t-\n");
-
-	/* print the snapshots of the given subvol if any*/
-	printf("\tSnapshot(s):\n");
+	fmt_start(&fctx, subvol_show_rowspec, 24, 8);
+	fmt_print_start_group(&fctx, "subvolume-show", JSON_TYPE_MAP);
+	fmt_print(&fctx, "path",
+		subvol.id == BTRFS_FS_TREE_OBJECTID ? "/" : subvol_path);
+	fmt_print(&fctx, "name",
+		(subvol.id == BTRFS_FS_TREE_OBJECTID ? "<FS_TREE>" :
+		 basename(subvol_path)));
+	fmt_print(&fctx, "uuid", subvol.uuid);
+	fmt_print(&fctx, "parent-uuid", subvol.uuid);
+	fmt_print(&fctx, "received-uuid", subvol.uuid);
+	fmt_print(&fctx, "otime", subvol.otime.tv_sec);
+	fmt_print(&fctx, "subvolume-id", subvol.id);
+	fmt_print(&fctx, "generation", subvol.generation);
+	fmt_print(&fctx, "parent-id", subvol.parent_id);
+	fmt_print(&fctx, "toplevel-id", subvol.parent_id);
+	fmt_print(&fctx, "flags", (subvol.flags & BTRFS_ROOT_SUBVOL_RDONLY) ?
+				  "readonly" : "-");
+	fmt_print(&fctx, "snapshots");
+	fctx.indent += fctx.width;
 
 	err = btrfs_util_create_subvolume_iterator_fd(fd,
 						      BTRFS_FS_TREE_OBJECTID, 0,
@@ -1121,12 +1134,18 @@ static int cmd_subvol_show(const struct cmd_struct *cmd, int argc, char **argv)
 			goto out;
 		}
 
-		if (uuid_compare(subvol2.parent_uuid, subvol.uuid) == 0)
-			printf("\t\t\t\t%s\n", path);
+		if (uuid_compare(subvol2.parent_uuid, subvol.uuid) == 0) {
+			fmt_start_list_value(&fctx);
+			printf("%s", path);
+			fmt_end_list_value(&fctx);
+		}
 
 		free(path);
 	}
 	btrfs_util_destroy_subvolume_iterator(iter);
+
+	fctx.indent -= fctx.width;
+	fmt_print_end_group(&fctx, "snapshots");
 
 	ret = btrfs_qgroup_query(fd, subvol.id, &stats);
 	if (ret == -ENOTTY) {
@@ -1146,27 +1165,27 @@ static int cmd_subvol_show(const struct cmd_struct *cmd, int argc, char **argv)
 		goto out;
 	}
 
-	printf("\tQuota group:\t\t0/%" PRIu64 "\n", subvol.id);
-	fflush(stdout);
-
-	printf("\t  Limit referenced:\t%s\n",
-			stats.limit.max_referenced == 0 ? "-" :
-			pretty_size_mode(stats.limit.max_referenced, unit_mode));
-	printf("\t  Limit exclusive:\t%s\n",
-			stats.limit.max_exclusive == 0 ? "-" :
-			pretty_size_mode(stats.limit.max_exclusive, unit_mode));
-	printf("\t  Usage referenced:\t%s\n",
-			pretty_size_mode(stats.info.referenced, unit_mode));
-	printf("\t  Usage exclusive:\t%s\n",
-			pretty_size_mode(stats.info.exclusive, unit_mode));
-
+	fmt_print(&fctx, "quota-group");
+	fctx.indent += 2;
+	fmt_print(&fctx, "quota-groupid", (u64)0, subvol.id);
+	fmt_print(&fctx, "quota-limit-ref", stats.limit.max_referenced,
+			unit_mode);
+	fmt_print(&fctx, "quota-limit-excl", stats.limit.max_exclusive,
+			unit_mode);
+	fmt_print(&fctx, "quota-usage-ref", stats.info.referenced, unit_mode);
+	fmt_print(&fctx, "quota-usage-excl", stats.info.exclusive, unit_mode);
+	fctx.indent -= 2;
+	fmt_print_end_group(&fctx, "quota-group");
 out:
+	fmt_print_end_group(&fctx, "subvolume-show");
+	fmt_end(&fctx);
+
 	free(subvol_path);
 	close_file_or_dir(fd, dirstream1);
 	free(fullpath);
 	return !!ret;
 }
-static DEFINE_SIMPLE_COMMAND(subvol_show, "show");
+static DEFINE_COMMAND_WITH_FLAGS(subvol_show, "show", CMD_FORMAT_JSON);
 
 static const char * const cmd_subvol_sync_usage[] = {
 	"btrfs subvolume sync <path> [<subvol-id>...]",
